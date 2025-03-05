@@ -1,105 +1,78 @@
-#include <Servo.h>
 #include <LiquidCrystal.h>
+#include <Servo.h>
 
-// Pin Definitions
-const int trigPin = 6;
-const int echoPin = 7;
-const int photoelectricPin = 8;
-const int servoPin = 9;
-const int ledPin = 10;
-const int buzzerPin = 13;
-const int moistureAnalogPin = A0;
-const int moistureDigitalPin = A1;
+// **Pin Definitions**
+const int trigPin = 6;     // HC-SR04 Trig
+const int echoPin = 7;     // HC-SR04 Echo
+const int moisturePin = A1; // HW130 Analog Output
+const int moistureDOPin = 8; // HW130 Digital Output
+const int ledPin = 10;     // LED
+const int servoPin = 9;    // Servo motor
 
-// Initialize LCD: (RS, E, D4, D5, D6, D7)
+// **Components**
 LiquidCrystal lcd(12, 11, 5, 4, 3, 2);
+Servo sorterServo;
 
-// Initialize Servo
-Servo myServo;
-
-// Variables
-long duration;
-int distance;
-int moistureLevel;
-bool moistureDetected;
-bool objectDetected;
+// **Constants**
+const int objectDistanceThreshold = 20;  // Distance threshold in cm
+const int moistureThreshold = 100;  // Threshold for moisture sensor
 
 void setup() {
-  // Initialize Serial Monitor
-  Serial.begin(9600);
+    Serial.begin(9600);
+    pinMode(trigPin, OUTPUT);
+    pinMode(echoPin, INPUT);
+    pinMode(moisturePin, INPUT);
+    pinMode(moistureDOPin, INPUT);
+    pinMode(ledPin, OUTPUT);
 
-  // Set Pin Modes
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
-  pinMode(photoelectricPin, INPUT);
-  pinMode(servoPin, OUTPUT);
-  pinMode(ledPin, OUTPUT);
-  pinMode(buzzerPin, OUTPUT);
-  pinMode(moistureAnalogPin, INPUT);
-  pinMode(moistureDigitalPin, INPUT);
-
-  // Attach Servo
-  myServo.attach(servoPin);
-
-  // Initialize LCD
-  lcd.begin(16, 2);
-  lcd.print("System Initializing");
-  delay(2000);
-  lcd.clear();
+    sorterServo.attach(servoPin);
+    lcd.begin(16, 2);
+    lcd.print("System Ready...");
+    delay(1000);
+    lcd.clear();
 }
 
 void loop() {
-  // Measure Distance using Ultrasonic Sensor
-  digitalWrite(trigPin, LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPin, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPin, LOW);
-  duration = pulseIn(echoPin, HIGH);
-  distance = duration * 0.034 / 2;
+    // **Step 1: Check for Object using HC-SR04**
+    long duration;
+    int distance;
 
-  // Read Moisture Sensor
-  moistureLevel = analogRead(moistureAnalogPin);
-  moistureDetected = digitalRead(moistureDigitalPin);
+    digitalWrite(trigPin, LOW);
+    delayMicroseconds(2);
+    digitalWrite(trigPin, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPin, LOW);
+    
+    duration = pulseIn(echoPin, HIGH);
+    distance = duration * 0.034 / 2;  // Convert to cm
 
-  // Read Photoelectric Switch
-  objectDetected = digitalRead(photoelectricPin);
+    if (distance > 0 && distance < objectDistanceThreshold) {  // Object detected
+        digitalWrite(ledPin, HIGH);
+        lcd.setCursor(0, 0);
+        lcd.print("Object Detected");
+        Serial.print("Object close enough.\n");
 
-  // Display Distance on LCD
-  lcd.setCursor(0, 0);
-  lcd.print("Distance: ");
-  lcd.print(distance);
-  lcd.print(" cm");
+        // **Step 2: Check Moisture Level (Type of Waste)**
+        int moistureValue = analogRead(moisturePin);
+        bool isWetWaste = moistureValue > moistureThreshold;  // If higher, wet waste
 
-  // Display Moisture Level on LCD
-  lcd.setCursor(0, 1);
-  lcd.print("Moisture: ");
-  lcd.print(moistureLevel);
-
-  // Check for Waste Presence
-  if (distance < 10) {
-    digitalWrite(ledPin, HIGH); // Turn on LED
-    digitalWrite(buzzerPin, HIGH); // Turn on Buzzer
-    delay(500);
-    digitalWrite(buzzerPin, LOW); // Turn off Buzzer
-
-    // Determine Waste Type
-    if (moistureDetected == LOW) {
-      // Wet Waste Detected
-      lcd.clear();
-      lcd.print("Wet Waste Detected");
-      myServo.write(90); // Rotate Servo to 90 degrees for wet waste
+        lcd.setCursor(0, 1);
+        if (isWetWaste) {
+            lcd.print("Wet Waste");
+            sorterServo.write(90);  // Rotate to wet waste bin
+            Serial.print("Servo 90.\n");
+        } else {
+            lcd.print("Dry Waste");
+            sorterServo.write(0);  // Rotate to dry waste bin
+            Serial.print("Servo 0.\n");
+        }
+        delay(2000);
     } else {
-      // Dry Waste Detected
-      lcd.clear();
-      lcd.print("Dry Waste Detected");
-      myServo.write(45); // Rotate Servo to 45 degrees for dry waste
+        digitalWrite(ledPin, LOW);
+        sorterServo.write(45);  // Neutral position
+        Serial.print("Servo 45.\n");
+        lcd.clear();
     }
-    delay(2000); // Wait for sorting
-    myServo.write(0); // Reset Servo to initial position
-  } else {
-    digitalWrite(ledPin, LOW); // Turn off LED
-  }
 
-  delay(500);
+    delay(500);
 }
