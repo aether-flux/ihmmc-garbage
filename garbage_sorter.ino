@@ -7,6 +7,7 @@ const int echoPin = 7;     // HC-SR04 Echo
 const int moisturePin = A1; // HW130 Analog Output
 const int moistureDOPin = 8; // HW130 Digital Output
 const int ledPin = 10;     // LED
+const int buzzPin = 13;    // Buzzer
 const int servoPin = 9;    // Servo motor
 
 // **Components**
@@ -24,6 +25,7 @@ void setup() {
     pinMode(moisturePin, INPUT);
     pinMode(moistureDOPin, INPUT);
     pinMode(ledPin, OUTPUT);
+    pinMode(buzzPin, OUTPUT);
 
     sorterServo.attach(servoPin);
     lcd.begin(16, 2);
@@ -48,6 +50,7 @@ void loop() {
 
     if (distance > 0 && distance < objectDistanceThreshold) {  // Object detected
         digitalWrite(ledPin, HIGH);
+        digitalWrite(buzzPin, HIGH);
         lcd.setCursor(0, 0);
         lcd.print("Object Detected");
         Serial.print("Object close enough.\n");
@@ -69,6 +72,7 @@ void loop() {
         delay(2000);
     } else {
         digitalWrite(ledPin, LOW);
+        digitalWrite(buzzPin, LOW);
         sorterServo.write(45);  // Neutral position
         Serial.print("Servo 45.\n");
         lcd.clear();
